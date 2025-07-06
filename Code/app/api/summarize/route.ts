@@ -13,3 +13,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ summary, keywords });
 }
+// Note: This is a mock implementation. In a real scenario, you would use an AI model or library to generate the summary.

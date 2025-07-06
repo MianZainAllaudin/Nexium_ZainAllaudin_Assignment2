@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
@@ -13,57 +14,68 @@ export default function BlogSummarizer() {
   const [url, setUrl] = useState("");
   const [summary, setSummary] = useState("");
   const [urduTranslation, setUrduTranslation] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setSummary("");
+    setUrduTranslation("");
+    try {
+      // Step 1: Scrape text
+      const scrapeRes = await fetch("/api/scrape", {
+        method: "POST",
+        body: JSON.stringify({ url }),
+      });
+      const scrapeData = await scrapeRes.json();
+      const text = scrapeData.text;
 
-    // Step 1: Scrape text
-    const scrapeRes = await fetch("/api/scrape", {
-      method: "POST",
-      body: JSON.stringify({ url }),
-    });
-    const scrapeData = await scrapeRes.json();
-    const text = scrapeData.text;
-    // if (!text) {
-    //   console.error("Scraping failed:", scrapeData.error);
-    //   alert("Scraping failed: " + (scrapeData.error || "Unknown error"));
-    //   return;
-    // }
+      // Step 2: Generate summary
+      const summaryRes = await fetch("/api/summarize", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      });
+      const summaryData = await summaryRes.json();
+      const summary = summaryData.summary;
+      if (!summary) {
+        console.error("Summarization failed:", summaryData.error);
+        alert(
+          "Summarization failed: " + (summaryData.error || "Unknown error")
+        );
+        setLoading(false);
+        return;
+      }
 
-    // Step 2: Generate summary
-    const summaryRes = await fetch("/api/summarize", {
-      method: "POST",
-      body: JSON.stringify({ text }),
-    });
-    const summaryData = await summaryRes.json();
-    const summary = summaryData.summary;
-    if (!summary) {
-      console.error("Summarization failed:", summaryData.error);
-      alert("Summarization failed: " + (summaryData.error || "Unknown error"));
-      return;
+      // Step 3: Translate to Urdu
+      const translateRes = await fetch("/api/translate", {
+        method: "POST",
+        body: JSON.stringify({ text: summary }),
+      });
+      const translateData = await translateRes.json();
+      const translated = translateData.translated;
+      if (!translated) {
+        console.error("Translation failed:", translateData.error);
+        alert(
+          "Translation failed: " + (translateData.error || "Unknown error")
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Save to databases
+      await saveToMongo(url, text); // MongoDB
+      await supabase
+        .from("summaries")
+        .insert({ url, summary, urdu_translation: translated }); // Supabase
+
+      setSummary(summary);
+      setUrduTranslation(translated);
+    } catch (err) {
+      alert("An error occurred during summarization.");
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-
-    // Step 3: Translate to Urdu
-    const translateRes = await fetch("/api/translate", {
-      method: "POST",
-      body: JSON.stringify({ text: summary }),
-    });
-    const translateData = await translateRes.json();
-    const translated = translateData.translated;
-    if (!translated) {
-      console.error("Translation failed:", translateData.error);
-      alert("Translation failed: " + (translateData.error || "Unknown error"));
-      return;
-    }
-
-    // Save to databases
-    await saveToMongo(url, text); // MongoDB
-    await supabase
-      .from("summaries")
-      .insert({ url, summary, urdu_translation: translated }); // Supabase
-
-    setSummary(summary);
-    setUrduTranslation(translated);
   };
 
   return (
@@ -75,11 +87,26 @@ export default function BlogSummarizer() {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Enter blog URL"
+          disabled={loading}
         />
-        <Button type="submit">Summarize</Button>
+        <Button
+          type="submit"
+          disabled={loading}
+          className="flex items-center gap-2"
+        >
+          {loading ? <Spinner /> : null}
+          {loading ? "Summarizing..." : "Summarize"}
+        </Button>
       </form>
 
-      {summary && (
+      {loading && (
+        <div className="mt-8 flex items-center gap-2 text-muted-foreground">
+          <Spinner className="w-6 h-6" />
+          <span>Summarizing, translating, and saving...</span>
+        </div>
+      )}
+
+      {summary && !loading && (
         <div className="mt-8 space-y-4">
           <Card>
             <CardContent className="p-4">
