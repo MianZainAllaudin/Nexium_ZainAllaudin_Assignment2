@@ -73,7 +73,8 @@ A modern Next.js app to scrape blog posts, generate summaries, translate them to
 
 ## Deployment
 
--Yet to share
+https://blogsummarizer.vercel.app/
+
 ---
 
 ## License
