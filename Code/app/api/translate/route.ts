@@ -1,5 +1,29 @@
 import { NextResponse } from "next/server";
 
+// Helper to dynamically import and use @vitalets/google-translate-api
+async function translate(text: string, opts: { to: string }) {
+  try {
+    const mod = await import("@vitalets/google-translate-api");
+    // Try both .default and .translate for compatibility
+    // Try .translate (named export) first, then .default (for ESM/CJS interop)
+    if (typeof mod.translate === "function") {
+      return await mod.translate(text, opts);
+    }
+    if (mod.default && typeof mod.default.translate === "function") {
+      return await mod.default.translate(text, opts);
+    }
+    throw new Error(
+      "No callable export found in @vitalets/google-translate-api"
+    );
+  } catch (err) {
+    throw new Error(
+      "Translation API import or call failed: " +
+        (err instanceof Error ? err.message : String(err))
+    );
+  }
+}
+
+// Fallback dictionary for when the API is unavailable
 const urduDict: Record<string, string> = {
   the: "وہ",
   and: "اور",
@@ -122,10 +146,25 @@ export async function POST(request: Request) {
   if (!text || typeof text !== "string") {
     return NextResponse.json({ error: "No text provided" }, { status: 400 });
   }
-  const translated = text
-    .split(" ")
-    .map((word: string) => urduDict[word.toLowerCase()] || word)
-    .join(" ");
 
-  return NextResponse.json({ translated });
+  try {
+    // Use @vitalets/google-translate-api
+    const result = await translate(text, { to: "ur" });
+    if (result && typeof result.text === "string") {
+      return NextResponse.json({ translated: result.text });
+    } else {
+      throw new Error("API response format unexpected");
+    }
+  } catch (error) {
+    console.error("Translation API error:", error);
+    // Fallback to dictionary-based translation if API fails
+    const translated = text
+      .split(" ")
+      .map((word: string) => urduDict[word.toLowerCase()] || word)
+      .join(" ");
+    return NextResponse.json({
+      translated,
+      note: "Used fallback dictionary translation due to API issue",
+    });
+  }
 }
