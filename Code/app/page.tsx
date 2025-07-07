@@ -33,7 +33,7 @@ export default function BlogSummarizer() {
       // Step 2: Generate summary
       const summaryRes = await fetch("/api/summarize", {
         method: "POST",
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, url }),
       });
       const summaryData = await summaryRes.json();
       const summary = summaryData.summary;
