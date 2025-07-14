@@ -63,6 +63,18 @@ A modern Next.js app to scrape blog posts, generate summaries, translate them to
 
 ---
 
+## Sign in to [Supabase.com](https://supabase.com/)
+**Go to SQL Editor and then run this Query**
+  ```bash
+CREATE TABLE summaries (
+     id SERIAL PRIMARY KEY,
+     url TEXT,
+     summary TEXT,
+     urdu_translation TEXT,
+     created_at TIMESTAMP DEFAULT NOW()
+);
+   ```
+
 ## Usage
 
 - **Enter a blog URL** and click **Summarize**.
